@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AR手势</string>
+
+    <string name="english_app_name">AR Gesture</string>
+    <string name="accessibility_service_label">AR手势控制服务</string>
+    <string name="accessibility_service_description">此服务通过摄像头识别手势来模拟触摸操作，以实现隔空控制设备。需要摄像头和悬浮窗权限。</string>
+    <string name="open_accessibility_settings">1. 开启无障碍服务</string>
+    <string name="open_camera_permission">2. 授予相机权限</string>
+    <string name="open_settings">参数修改</string>
+    <string name="settings_title">参数设置</string>
+    <string name="preview_title">手势预览</string>
+    <string name="permissions_granted">所有权限已就绪！服务正在后台运行。</string>
+    <string name="permissions_not_granted">请授予所有必要的权限以使应用正常工作。</string>
+    <string name="close_ar_gesture">关闭AR手势</string>
+    <string name="close_ar_gesture_button">关闭</string>
+</resources>
