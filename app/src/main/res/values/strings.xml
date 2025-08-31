@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">AR Gesture</string>
+
+    <string name="english_app_name">AR Gesture</string>
+    <string name="accessibility_service_label">AR gesture control service</string>
+    <string name="accessibility_service_description">This service uses the camera to recognize gestures and simulate touch operations, enabling airborne control of devices. Requires the camera and floating window permissions.</string>
+    <string name="open_accessibility_settings">1. Enable accessibility services</string>
+    <string name="open_camera_permission">2. Grant camera permissions</string>
+    <string name="open_settings">Change values</string>
+    <string name="settings_title">Setting values</string>
+    <string name="preview_title">Gesture preview</string>
+    <string name="permissions_granted">All permissions are in place! The service is running in the background.</string>
+    <string name="permissions_not_granted">Please grant all necessary permissions for the app to work properly.</string>
+    <string name="close_ar_gesture">Close AR gesture.</string>
+    <string name="close_ar_gesture_button">Close</string>
+</resources>
