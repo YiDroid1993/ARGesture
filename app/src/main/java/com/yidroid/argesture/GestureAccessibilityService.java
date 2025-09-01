@@ -62,6 +62,7 @@ public class GestureAccessibilityService extends AccessibilityService
     private final BroadcastReceiver previewControlReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
+            Log.d(TAG, "previewControlReceiver onReceive intent=" + intent);
             if (ACTION_TOGGLE_PREVIEW.equals(intent.getAction())) {
                 togglePreviewState();
             }
@@ -78,7 +79,7 @@ public class GestureAccessibilityService extends AccessibilityService
         gestureProcessor = new GestureProcessor(this, this);
         cameraHelper = new CameraHelper(this, this);
 
-        ContextCompat.registerReceiver(this, previewControlReceiver, new IntentFilter(ACTION_TOGGLE_PREVIEW), ContextCompat.RECEIVER_NOT_EXPORTED);
+        ContextCompat.registerReceiver(this, previewControlReceiver, new IntentFilter(ACTION_TOGGLE_PREVIEW), ContextCompat.RECEIVER_EXPORTED);
 
         startGestureControl();
         mainHandler.post(this::togglePreviewState);
@@ -94,6 +95,7 @@ public class GestureAccessibilityService extends AccessibilityService
     }
 
     private void togglePreviewState() {
+        Log.d(TAG, "togglePreviewState isPreviewVisible=" + isPreviewVisible);
         if (isPreviewVisible) {
             viewControl.hidePreview();
             cameraHelper.stopCamera();
