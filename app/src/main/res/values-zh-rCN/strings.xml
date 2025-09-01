@@ -12,6 +12,7 @@
     <string name="preview_title">手势预览</string>
     <string name="permissions_granted">所有权限已就绪！服务正在后台运行。</string>
     <string name="permissions_not_granted">请授予所有必要的权限以使应用正常工作。</string>
+    <string name="gesture_tips">点击手势：大拇指、食指、中指指尖捏合\n返回手势：中指画圈\n回到回桌面：握拳</string>
     <string name="close_ar_gesture">关闭AR手势</string>
     <string name="close_ar_gesture_button">关闭</string>
 </resources>

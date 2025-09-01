@@ -1,6 +1,6 @@
 // =================================================================================
 // 文件: app/src/main/java/com/yidroid/argesture/CameraHelper.java
-// 描述: 封装所有相机底层操作的帮助类。
+// 描述: [已重构] 封装所有相机底层操作的帮助类，并修复崩溃问题。
 // =================================================================================
 package com.yidroid.argesture;
 
@@ -44,15 +44,16 @@ public class CameraHelper {
     private final GestureSettings settings;
     private final YuvToRgbConverter yuvToRgbConverter;
 
-    private CameraManager cameraManager;
+    private final CameraManager cameraManager;
     private CameraDevice cameraDevice;
     private CameraCaptureSession captureSession;
     private ImageReader imageReader;
     private HandlerThread cameraThread;
     private Handler cameraHandler;
-    private AtomicBoolean isCameraOpening = new AtomicBoolean(false);
+    private final AtomicBoolean isCameraOpening = new AtomicBoolean(false);
     private String activeCameraId;
     private Surface activeSurface;
+    private volatile boolean isStopping = false;
 
     public CameraHelper(Context context, CameraListener listener) {
         this.context = context;
@@ -74,6 +75,7 @@ public class CameraHelper {
     @SuppressLint("MissingPermission")
     public void startCamera(Surface previewSurface) {
         if (isCameraOpening.getAndSet(true)) return;
+        isStopping = false;
 
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             listener.onCameraError("Camera permission not granted.");
@@ -95,18 +97,20 @@ public class CameraHelper {
                 }
 
                 activeCameraId = selectedCameraId;
-                CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(selectedCameraId);
+                CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(activeCameraId);
                 int sensorRotation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
                 int facing = characteristics.get(CameraCharacteristics.LENS_FACING);
 
-                listener.onCameraConfigured(selectedCameraId, sensorRotation, facing);
+                listener.onCameraConfigured(activeCameraId, sensorRotation, facing);
 
                 imageReader = ImageReader.newInstance(settings.CAMERA_WIDTH, settings.CAMERA_HEIGHT, ImageFormat.YUV_420_888, 2);
                 imageReader.setOnImageAvailableListener(this::onImageAvailable, cameraHandler);
 
-                cameraManager.openCamera(selectedCameraId, new CameraDevice.StateCallback() {
+                cameraManager.openCamera(activeCameraId, new CameraDevice.StateCallback() {
                     @Override
                     public void onOpened(@NonNull CameraDevice camera) {
+                        Log.d(TAG, "onOpened");
+                        if (isStopping) { camera.close(); return; }
                         isCameraOpening.set(false);
                         cameraDevice = camera;
                         activeSurface = previewSurface;
@@ -115,17 +119,19 @@ public class CameraHelper {
 
                     @Override
                     public void onDisconnected(@NonNull CameraDevice camera) {
+                        Log.d(TAG, "onDisconnected");
                         isCameraOpening.set(false);
                         camera.close();
-                        cameraDevice = null;
+                        if (cameraDevice == camera) cameraDevice = null;
                     }
 
                     @Override
                     public void onError(@NonNull CameraDevice camera, int error) {
+                        Log.d(TAG, "onError");
                         isCameraOpening.set(false);
                         listener.onCameraError("Camera device error: " + error);
                         camera.close();
-                        cameraDevice = null;
+                        if (cameraDevice == camera) cameraDevice = null;
                     }
                 }, cameraHandler);
             } catch (CameraAccessException e) {
@@ -136,6 +142,7 @@ public class CameraHelper {
     }
 
     public void stopCamera() {
+        isStopping = true;
         try {
             if (captureSession != null) { captureSession.close(); captureSession = null; }
             if (cameraDevice != null) { cameraDevice.close(); cameraDevice = null; }
@@ -176,9 +183,9 @@ public class CameraHelper {
         }
     };
 
-    public void createCaptureSession(Surface previewSurface) {
+    private void createCaptureSession(Surface previewSurface) {
+        if (isStopping || cameraDevice == null || previewSurface == null || !previewSurface.isValid() || imageReader == null) return;
         try {
-            if (cameraDevice == null || previewSurface == null || !previewSurface.isValid() || imageReader == null) return;
             Surface imageReaderSurface = imageReader.getSurface();
             final CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             builder.addTarget(imageReaderSurface);
@@ -216,7 +223,9 @@ public class CameraHelper {
     }
 
     private void stopCameraThread() {
-        cameraManager.unregisterAvailabilityCallback(cameraAvailabilityCallback);
+        if (cameraManager != null) {
+            cameraManager.unregisterAvailabilityCallback(cameraAvailabilityCallback);
+        }
         if (cameraThread != null) {
             cameraThread.quitSafely();
             try {

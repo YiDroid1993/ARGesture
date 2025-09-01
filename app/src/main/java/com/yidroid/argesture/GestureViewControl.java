@@ -9,6 +9,8 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.graphics.SurfaceTexture;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.Surface;
 import android.view.TextureView;
@@ -19,6 +21,7 @@ import androidx.annotation.NonNull;
 
 public class GestureViewControl {
 
+    private static final String TAG = "GestureViewControl";
     private final Context context;
     private final WindowManager windowManager;
     private final GestureSettings settings;
@@ -39,8 +42,11 @@ public class GestureViewControl {
         return cameraPreview;
     }
 
-    public void showPreview(TextureView.SurfaceTextureListener listener) {
-        if (cameraPreview != null) return;
+    public void showPreview(TextureView.SurfaceTextureListener surfaceTextureListener) {
+        if (cameraPreview != null) {
+            cameraPreview.setVisibility(View.VISIBLE);
+            return;
+        }
 
         boolean isLandscape = settings.SCREEN_ROTATION == Surface.ROTATION_90 || settings.SCREEN_ROTATION == Surface.ROTATION_270;
         int previewWidth = isLandscape ? settings.PREVIEW_WINDOW_WIDTH : settings.PREVIEW_WINDOW_HEIGHT;
@@ -58,12 +64,15 @@ public class GestureViewControl {
         params.alpha = settings.PREVIEW_WINDOW_ALPHA;
 
         windowManager.addView(cameraPreview, params);
+       TextureView.SurfaceTextureListener listener = cameraPreview.getSurfaceTextureListener();
+       if (listener == null) {
+           cameraPreview.setSurfaceTextureListener(surfaceTextureListener);
+       }
     }
 
     public void hidePreview() {
         if (cameraPreview != null && cameraPreview.isAttachedToWindow()) {
-            windowManager.removeView(cameraPreview);
-            cameraPreview = null;
+            cameraPreview.setVisibility(View.GONE);
         }
     }
 

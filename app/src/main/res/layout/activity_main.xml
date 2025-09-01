@@ -43,4 +43,12 @@
         android:layout_height="wrap_content"
         android:text="@string/open_settings" />
 
+    <TextView
+        android:id="@+id/tv_tips"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/red"
+        android:text="@string/gesture_tips"
+        android:textSize="20sp" />
+
 </LinearLayout>

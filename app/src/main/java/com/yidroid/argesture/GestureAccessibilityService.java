@@ -62,7 +62,6 @@ public class GestureAccessibilityService extends AccessibilityService
     private final BroadcastReceiver previewControlReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            Log.d(TAG, "previewControlReceiver onReceive intent=" + intent);
             if (ACTION_TOGGLE_PREVIEW.equals(intent.getAction())) {
                 togglePreviewState();
             }
@@ -91,28 +90,21 @@ public class GestureAccessibilityService extends AccessibilityService
         if (settings != null) {
             settings.onConfigurationChanged(newConfig);
         }
-        // The CameraPreview view will handle its own configuration changes
     }
 
     private void togglePreviewState() {
-        Log.d(TAG, "togglePreviewState isPreviewVisible=" + isPreviewVisible);
         if (isPreviewVisible) {
             viewControl.hidePreview();
             cameraHelper.stopCamera();
             isPreviewVisible = false;
         } else {
-            viewControl.showPreview(null); // Listener is now inside CameraPreview
-            CameraPreview preview = viewControl.getCameraPreview();
-            if (preview != null) {
-                preview.setSurfaceTextureListener(surfaceTextureListener);
-            }
+            viewControl.showPreview(surfaceTextureListener);
             isPreviewVisible = true;
         }
         updateNotification();
     }
 
     private final TextureView.SurfaceTextureListener surfaceTextureListener = new TextureView.SurfaceTextureListener() {
-
         @Override
         public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surfaceTexture, int width, int height) {
             if (isGestureControlActive.get()) {
@@ -134,8 +126,7 @@ public class GestureAccessibilityService extends AccessibilityService
         }
 
         @Override
-        public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {
-        }
+        public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {}
     };
 
     private void startGestureControl() {
@@ -276,4 +267,3 @@ public class GestureAccessibilityService extends AccessibilityService
     @Override public void onAccessibilityEvent(AccessibilityEvent event) {}
     @Override public void onInterrupt() { Log.d(TAG, "Accessibility Service Interrupted"); }
 }
-
