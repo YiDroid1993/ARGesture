@@ -51,6 +51,8 @@ public class CameraHelper {
     private HandlerThread cameraThread;
     private Handler cameraHandler;
     private AtomicBoolean isCameraOpening = new AtomicBoolean(false);
+    private String activeCameraId;
+    private Surface activeSurface;
 
     public CameraHelper(Context context, CameraListener listener) {
         this.context = context;
@@ -92,6 +94,7 @@ public class CameraHelper {
                     return;
                 }
 
+                activeCameraId = selectedCameraId;
                 CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(selectedCameraId);
                 int sensorRotation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
                 int facing = characteristics.get(CameraCharacteristics.LENS_FACING);
@@ -106,6 +109,7 @@ public class CameraHelper {
                     public void onOpened(@NonNull CameraDevice camera) {
                         isCameraOpening.set(false);
                         cameraDevice = camera;
+                        activeSurface = previewSurface;
                         createCaptureSession(previewSurface);
                     }
 
@@ -152,6 +156,26 @@ public class CameraHelper {
         }
     }
 
+    private final CameraManager.AvailabilityCallback cameraAvailabilityCallback = new CameraManager.AvailabilityCallback() {
+        @Override
+        public void onCameraAvailable(@NonNull String cameraId) {
+            super.onCameraAvailable(cameraId);
+            if (activeCameraId != null && activeCameraId.equals(cameraId) && activeSurface != null && cameraHandler != null) {
+                Log.i(TAG, "Our active camera (" + cameraId + ") became available. Re-opening...");
+                cameraHandler.post(() -> startCamera(activeSurface));
+            }
+        }
+
+        @Override
+        public void onCameraUnavailable(@NonNull String cameraId) {
+            super.onCameraUnavailable(cameraId);
+            if (activeCameraId != null && activeCameraId.equals(cameraId) && captureSession != null) {
+                Log.w(TAG, "Our active camera (" + cameraId + ") became unavailable (likely used by another app).");
+                captureSession.close();
+            }
+        }
+    };
+
     public void createCaptureSession(Surface previewSurface) {
         try {
             if (cameraDevice == null || previewSurface == null || !previewSurface.isValid() || imageReader == null) return;
@@ -176,6 +200,7 @@ public class CameraHelper {
                 @Override
                 public void onConfigureFailed(@NonNull CameraCaptureSession session) {
                     listener.onCameraError("Failed to configure capture session.");
+                    session.close();
                 }
             }, cameraHandler);
         } catch (CameraAccessException e) {
@@ -187,9 +212,11 @@ public class CameraHelper {
         cameraThread = new HandlerThread("CameraHelperThread");
         cameraThread.start();
         cameraHandler = new Handler(cameraThread.getLooper());
+        cameraManager.registerAvailabilityCallback(cameraAvailabilityCallback, cameraHandler);
     }
 
     private void stopCameraThread() {
+        cameraManager.unregisterAvailabilityCallback(cameraAvailabilityCallback);
         if (cameraThread != null) {
             cameraThread.quitSafely();
             try {

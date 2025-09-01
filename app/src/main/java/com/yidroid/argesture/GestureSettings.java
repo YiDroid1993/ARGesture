@@ -48,7 +48,7 @@ public class GestureSettings {
     public long IDLE_TIMEOUT_MS = 60 * 1000; // 1分钟
 
     // --- 防抖 ---
-    public long CLICK_DEBOUNCE = 500;
+    public long CLICK_DEBOUNCE = 1000;
     public long HOME_DEBOUNCE = 1000;
     public long BACK_DEBOUNCE = 1000;
     public long SCROLL_INTERVAL = 100;
@@ -86,10 +86,14 @@ public class GestureSettings {
             case Surface.ROTATION_270:
                 SCREEN_WIDTH = Math.max(displaySize.x, displaySize.y);
                 SCREEN_HEIGHT = Math.min(displaySize.x, displaySize.y);
+                PREVIEW_WINDOW_HEIGHT = Math.min(displaySize.x, displaySize.y);
+                PREVIEW_WINDOW_WIDTH = (PREVIEW_WINDOW_HEIGHT / 2) * 3;
                 break;
             default: // ROTATION_0, ROTATION_180
                 SCREEN_WIDTH = Math.min(displaySize.x, displaySize.y);
                 SCREEN_HEIGHT = Math.max(displaySize.x, displaySize.y);
+                PREVIEW_WINDOW_WIDTH = Math.min(displaySize.x, displaySize.y);
+                PREVIEW_WINDOW_HEIGHT = (PREVIEW_WINDOW_WIDTH / 2) * 3;
                 break;
         }
 
