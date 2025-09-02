@@ -46,6 +46,7 @@ public class GestureAccessibilityService extends AccessibilityService
 
     private GestureSettings settings;
     private GestureViewControl viewControl;
+    private CameraPreviewControl previewControl;
     private GestureProcessor gestureProcessor;
     private GestureRecognizerHelper gestureRecognizerHelper;
     private CameraHelper cameraHelper;
@@ -75,6 +76,7 @@ public class GestureAccessibilityService extends AccessibilityService
 
         settings = GestureSettings.getInstance(this);
         viewControl = new GestureViewControl(this);
+        previewControl = new CameraPreviewControl(this);
         gestureProcessor = new GestureProcessor(this, this);
         cameraHelper = new CameraHelper(this, this);
 
@@ -90,15 +92,16 @@ public class GestureAccessibilityService extends AccessibilityService
         if (settings != null) {
             settings.onConfigurationChanged(newConfig);
         }
+        previewControl.onConfigurationChanged();
     }
 
     private void togglePreviewState() {
         if (isPreviewVisible) {
-            viewControl.hidePreview();
+            previewControl.hide();
             cameraHelper.stopCamera();
             isPreviewVisible = false;
         } else {
-            viewControl.showPreview(surfaceTextureListener);
+            previewControl.show(surfaceTextureListener);
             isPreviewVisible = true;
         }
         updateNotification();
@@ -114,9 +117,6 @@ public class GestureAccessibilityService extends AccessibilityService
 
         @Override
         public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surface, int width, int height) {
-            if (viewControl != null && viewControl.getCameraPreview() != null) {
-                //viewControl.getCameraPreview().updateTransform();
-            }
         }
 
         @Override
@@ -134,7 +134,7 @@ public class GestureAccessibilityService extends AccessibilityService
         Log.d(TAG, "Starting gesture control...");
 
         gestureRecognizerHelper = new GestureRecognizerHelper(this, this);
-        viewControl.createViews();
+        viewControl.createCursor();
         cameraHelper.start();
 
         resetIdleTimer();
@@ -151,7 +151,8 @@ public class GestureAccessibilityService extends AccessibilityService
             gestureRecognizerHelper.close();
             gestureRecognizerHelper = null;
         }
-        viewControl.removeViews();
+        viewControl.removeCursor();
+        previewControl.destroy();
 
         updateNotification();
     }
@@ -239,10 +240,6 @@ public class GestureAccessibilityService extends AccessibilityService
     public void onCameraConfigured(String cameraId, int sensorRotation, int facing) {
         this.cameraSensorRotation = sensorRotation;
         this.settings.ACTIVE_CAMERA_FACING = facing;
-
-        if(viewControl.getCameraPreview() != null){
-            mainHandler.post(() -> viewControl.getCameraPreview().setCameraSensorRotation(sensorRotation));
-        }
     }
 
     @Override
@@ -267,3 +264,4 @@ public class GestureAccessibilityService extends AccessibilityService
     @Override public void onAccessibilityEvent(AccessibilityEvent event) {}
     @Override public void onInterrupt() { Log.d(TAG, "Accessibility Service Interrupted"); }
 }
+

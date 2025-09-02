@@ -109,7 +109,6 @@ public class CameraHelper {
                 cameraManager.openCamera(activeCameraId, new CameraDevice.StateCallback() {
                     @Override
                     public void onOpened(@NonNull CameraDevice camera) {
-                        Log.d(TAG, "onOpened");
                         if (isStopping) { camera.close(); return; }
                         isCameraOpening.set(false);
                         cameraDevice = camera;
@@ -119,7 +118,6 @@ public class CameraHelper {
 
                     @Override
                     public void onDisconnected(@NonNull CameraDevice camera) {
-                        Log.d(TAG, "onDisconnected");
                         isCameraOpening.set(false);
                         camera.close();
                         if (cameraDevice == camera) cameraDevice = null;
@@ -127,7 +125,6 @@ public class CameraHelper {
 
                     @Override
                     public void onError(@NonNull CameraDevice camera, int error) {
-                        Log.d(TAG, "onError");
                         isCameraOpening.set(false);
                         listener.onCameraError("Camera device error: " + error);
                         camera.close();
@@ -194,8 +191,8 @@ public class CameraHelper {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
                     if (cameraDevice == null) return;
-                    captureSession = session;
                     try {
+                        captureSession = session;
                         builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
                         builder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, new Range<>(settings.DESIRED_CAMERA_FPS, settings.DESIRED_CAMERA_FPS));
                         session.setRepeatingRequest(builder.build(), null, cameraHandler);
@@ -208,6 +205,7 @@ public class CameraHelper {
                 public void onConfigureFailed(@NonNull CameraCaptureSession session) {
                     listener.onCameraError("Failed to configure capture session.");
                     session.close();
+                    captureSession = null;
                 }
             }, cameraHandler);
         } catch (CameraAccessException e) {

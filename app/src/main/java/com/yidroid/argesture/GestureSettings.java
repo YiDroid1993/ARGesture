@@ -165,13 +165,13 @@ public class GestureSettings {
                 SCREEN_WIDTH = Math.max(displaySize.x, displaySize.y);
                 SCREEN_HEIGHT = Math.min(displaySize.x, displaySize.y);
                 PREVIEW_WINDOW_HEIGHT = Math.min(displaySize.x, displaySize.y);
-                PREVIEW_WINDOW_WIDTH = (PREVIEW_WINDOW_HEIGHT / 2) * 3;
+                PREVIEW_WINDOW_WIDTH = (PREVIEW_WINDOW_HEIGHT / 9) * 16;
                 break;
             default: // ROTATION_0, ROTATION_180
                 SCREEN_WIDTH = Math.min(displaySize.x, displaySize.y);
                 SCREEN_HEIGHT = Math.max(displaySize.x, displaySize.y);
                 PREVIEW_WINDOW_WIDTH = Math.min(displaySize.x, displaySize.y);
-                PREVIEW_WINDOW_HEIGHT = (PREVIEW_WINDOW_WIDTH / 2) * 3;
+                PREVIEW_WINDOW_HEIGHT = (PREVIEW_WINDOW_WIDTH / 9) * 16;
                 break;
         }
 

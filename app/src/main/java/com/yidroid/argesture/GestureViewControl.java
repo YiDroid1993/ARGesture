@@ -1,6 +1,6 @@
 // =================================================================================
 // 文件: app/src/main/java/com/yidroid/argesture/GestureViewControl.java
-// 描述: [已重构] 负责光标和恢复后的CameraPreview悬浮窗管理。
+// 描述: [已重构] 负责光标悬浮窗管理。
 // =================================================================================
 package com.yidroid.argesture;
 
@@ -10,7 +10,6 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.SurfaceTexture;
-import android.util.Log;
 import android.view.Gravity;
 import android.view.Surface;
 import android.view.TextureView;
@@ -21,12 +20,10 @@ import androidx.annotation.NonNull;
 
 public class GestureViewControl {
 
-    private static final String TAG = "GestureViewControl";
     private final Context context;
     private final WindowManager windowManager;
     private final GestureSettings settings;
     private View cursorView;
-    private CameraPreview cameraPreview;
 
     public GestureViewControl(Context context) {
         this.context = context;
@@ -34,54 +31,7 @@ public class GestureViewControl {
         this.settings = GestureSettings.getInstance(context);
     }
 
-    public void createViews() {
-        createCursor();
-    }
-
-    public CameraPreview getCameraPreview() {
-        return cameraPreview;
-    }
-
-    public void showPreview(TextureView.SurfaceTextureListener surfaceTextureListener) {
-        if (cameraPreview != null) {
-            cameraPreview.setVisibility(View.VISIBLE);
-            return;
-        }
-
-        boolean isLandscape = settings.SCREEN_ROTATION == Surface.ROTATION_90 || settings.SCREEN_ROTATION == Surface.ROTATION_270;
-        int previewWidth = isLandscape ? settings.PREVIEW_WINDOW_WIDTH : settings.PREVIEW_WINDOW_HEIGHT;
-        int previewHeight = isLandscape ? settings.PREVIEW_WINDOW_HEIGHT : settings.PREVIEW_WINDOW_WIDTH;
-
-        cameraPreview = new CameraPreview(context);
-        WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                previewWidth,
-                previewHeight,
-                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
-                PixelFormat.TRANSLUCENT
-        );
-        params.gravity = Gravity.CENTER;
-        params.alpha = settings.PREVIEW_WINDOW_ALPHA;
-
-        windowManager.addView(cameraPreview, params);
-       TextureView.SurfaceTextureListener listener = cameraPreview.getSurfaceTextureListener();
-       if (listener == null) {
-           cameraPreview.setSurfaceTextureListener(surfaceTextureListener);
-       }
-    }
-
-    public void hidePreview() {
-        if (cameraPreview != null && cameraPreview.isAttachedToWindow()) {
-            cameraPreview.setVisibility(View.GONE);
-        }
-    }
-
-    public void removeViews() {
-        removeCursor();
-        hidePreview();
-    }
-
-    private void createCursor() {
+    public void createCursor() {
         if (cursorView != null) return;
         cursorView = new View(context);
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
