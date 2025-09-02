@@ -1,6 +1,6 @@
 // =================================================================================
 // 文件: app/src/main/java/com/yidroid/argesture/GestureAccessibilityService.java
-// 描述: [已重构] 核心服务类，恢复使用WindowManager管理自定义的CameraPreview。
+// 描述: [已重构] 核心服务类，更新了与OverlayView的交互。
 // =================================================================================
 package com.yidroid.argesture;
 
@@ -45,7 +45,7 @@ public class GestureAccessibilityService extends AccessibilityService
     private static final String ACTION_TOGGLE_PREVIEW = "com.yidroid.argesture.TOGGLE_PREVIEW";
 
     private GestureSettings settings;
-    private GestureViewControl viewControl;
+    private CursorControl cursorControl;
     private CameraPreviewControl previewControl;
     private GestureProcessor gestureProcessor;
     private GestureRecognizerHelper gestureRecognizerHelper;
@@ -53,6 +53,7 @@ public class GestureAccessibilityService extends AccessibilityService
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private int cameraSensorRotation = -1;
+    private int rotatedImageWidth, rotatedImageHeight;
 
     private AtomicBoolean isGestureControlActive = new AtomicBoolean(false);
     private boolean isPreviewVisible = false;
@@ -75,8 +76,8 @@ public class GestureAccessibilityService extends AccessibilityService
         Log.d(TAG, "Accessibility Service Connected");
 
         settings = GestureSettings.getInstance(this);
-        viewControl = new GestureViewControl(this);
-        previewControl = new CameraPreviewControl(this);
+        cursorControl = new CursorControl(this);
+        previewControl = new CameraPreviewControl(this, surfaceTextureListener);
         gestureProcessor = new GestureProcessor(this, this);
         cameraHelper = new CameraHelper(this, this);
 
@@ -92,7 +93,9 @@ public class GestureAccessibilityService extends AccessibilityService
         if (settings != null) {
             settings.onConfigurationChanged(newConfig);
         }
-        previewControl.onConfigurationChanged();
+        if (previewControl != null) {
+            previewControl.onConfigurationChanged();
+        }
     }
 
     private void togglePreviewState() {
@@ -101,7 +104,7 @@ public class GestureAccessibilityService extends AccessibilityService
             cameraHelper.stopCamera();
             isPreviewVisible = false;
         } else {
-            previewControl.show(surfaceTextureListener);
+            previewControl.show();
             isPreviewVisible = true;
         }
         updateNotification();
@@ -116,12 +119,11 @@ public class GestureAccessibilityService extends AccessibilityService
         }
 
         @Override
-        public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surface, int width, int height) {
-        }
+        public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surface, int width, int height) {}
 
         @Override
         public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surface) {
-            cameraHelper.stopCamera();
+            cameraHelper.stop();
             return true;
         }
 
@@ -134,7 +136,7 @@ public class GestureAccessibilityService extends AccessibilityService
         Log.d(TAG, "Starting gesture control...");
 
         gestureRecognizerHelper = new GestureRecognizerHelper(this, this);
-        viewControl.createCursor();
+        cursorControl.create();
         cameraHelper.start();
 
         resetIdleTimer();
@@ -151,7 +153,7 @@ public class GestureAccessibilityService extends AccessibilityService
             gestureRecognizerHelper.close();
             gestureRecognizerHelper = null;
         }
-        viewControl.removeCursor();
+        cursorControl.destroy();
         previewControl.destroy();
 
         updateNotification();
@@ -213,7 +215,12 @@ public class GestureAccessibilityService extends AccessibilityService
     @Override
     public void onResults(HandLandmarkerResult result) {
         mainHandler.post(() -> {
-            if (isGestureControlActive.get()) gestureProcessor.process(result);
+            if (isGestureControlActive.get()) {
+                gestureProcessor.process(result, rotatedImageWidth, rotatedImageHeight);
+                if (previewControl != null && isPreviewVisible) {
+                    previewControl.getOverlayView().setResults(result, rotatedImageWidth, rotatedImageHeight, settings.ACTIVE_CAMERA_FACING);
+                }
+            }
         });
     }
 
@@ -233,6 +240,8 @@ public class GestureAccessibilityService extends AccessibilityService
         matrix.postRotate(rotationDegrees);
 
         Bitmap rotatedBitmap = Bitmap.createBitmap(originalBitmap, 0, 0, originalBitmap.getWidth(), originalBitmap.getHeight(), matrix, true);
+        rotatedImageWidth = rotatedBitmap.getWidth();
+        rotatedImageHeight = rotatedBitmap.getHeight();
         gestureRecognizerHelper.recognizeLiveStream(rotatedBitmap);
     }
 
@@ -248,7 +257,7 @@ public class GestureAccessibilityService extends AccessibilityService
     }
 
     @Override public void onError(String error) { Log.e(TAG, "Gesture Recognition Error: " + error); }
-    @Override public void onUpdateCursor(int x, int y) { viewControl.setCursorVisibility(true); viewControl.updateCursorPosition(x, y); }
+    @Override public void onUpdateCursor(int x, int y) { cursorControl.setVisibility(true); cursorControl.updatePosition(x, y); }
     @Override public void onPerformClick(int x, int y) {
         if (x < 0 || y < 0 || x > settings.SCREEN_WIDTH || y > settings.SCREEN_HEIGHT) return;
         Path clickPath = new Path();
@@ -258,7 +267,12 @@ public class GestureAccessibilityService extends AccessibilityService
     @Override public void onPerformScroll(int x, int y, int direction) { } // Not implemented
     @Override public void onPerformHome() { performGlobalAction(GLOBAL_ACTION_HOME); }
     @Override public void onPerformBack() { performGlobalAction(GLOBAL_ACTION_BACK); }
-    @Override public void onNoHandDetected() { viewControl.setCursorVisibility(false); }
+    @Override public void onNoHandDetected() {
+        cursorControl.setVisibility(false);
+        if (previewControl != null && isPreviewVisible) {
+            previewControl.getOverlayView().setResults(null, 0, 0, settings.ACTIVE_CAMERA_FACING);
+        }
+    }
 
     // --- System Callbacks ---
     @Override public void onAccessibilityEvent(AccessibilityEvent event) {}

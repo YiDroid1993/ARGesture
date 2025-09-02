@@ -11,7 +11,7 @@
     <string name="preview_title">Gesture preview</string>
     <string name="permissions_granted">All permissions are in place! The service is running in the background.</string>
     <string name="permissions_not_granted">Please grant all necessary permissions for the app to work properly.</string>
-    <string name="gesture_tips">Click gesture: pinch with thumb, index finger, and middle finger\nReturn gesture: circle with middle finger\nReturn to desktop: make a fist</string>
+    <string name="gesture_tips">Click gesture: pinch with thumb, index finger, and middle finger. Return gesture: circle with middle finger or hook with index finger, middle finger, and ring finger. Return to desktop: make a fist.</string>
     <string name="close_ar_gesture">Close AR gesture.</string>
     <string name="close_ar_gesture_button">Close</string>
 </resources>

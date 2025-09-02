@@ -77,12 +77,12 @@ public class GestureProcessor {
         this.listener = listener;
     }
 
-    public void process(HandLandmarkerResult result) {
+    public void process(HandLandmarkerResult result, int imageWidth, int imageHeight) {
         if (result != null && !result.landmarks().isEmpty()) {
             checkForHandSwitch(result);
             List<NormalizedLandmark> landmarks = getActiveHandLandmarks(result);
             if (landmarks != null) {
-                processGestures(landmarks);
+                processGestures(landmarks, imageWidth, imageHeight);
                 return;
             }
         }
@@ -152,7 +152,7 @@ public class GestureProcessor {
      * 主手勢處理邏輯。
      * @param landmarks 當前主控手的21個關節點。
      */
-    private void processGestures(List<NormalizedLandmark> landmarks) {
+    private void processGestures(List<NormalizedLandmark> landmarks, int imageWidth, int imageHeight) {
         if (landmarks.size() < 21 || listener == null) return;
 
         // --- 1. 坐標平滑處理 ---
@@ -160,23 +160,37 @@ public class GestureProcessor {
         float rawY = landmarks.get(8).y(); // 食指指尖原始Y坐標
 
         if (settings.ACTIVE_CAMERA_FACING == CameraCharacteristics.LENS_FACING_FRONT) {
-            rawX = 1.0f - rawX; // 前置攝像頭鏡像處理
+            rawX = 1.0f - rawX;
         }
 
         PointF smoothedLandmark = getSmoothedLandmark(rawX, rawY);
-        int cursorX = (int) (settings.HORIZONTAL_OFFSET + (smoothedLandmark.x * settings.MAPPED_PREVIEW_WIDTH));
-        int cursorY = (int) (smoothedLandmark.y * settings.SCREEN_HEIGHT);
+
+        // --- ** 关键修正：重构坐标映射逻辑 ** ---
+        float imageAspectRatio = (float) imageWidth / imageHeight;
+        float screenAspectRatio = (float) settings.SCREEN_WIDTH / settings.SCREEN_HEIGHT;
+        int mappedWidth, mappedHeight, offsetX = 0, offsetY = 0;
+
+        if (imageAspectRatio > screenAspectRatio) {
+            mappedWidth = settings.SCREEN_WIDTH;
+            mappedHeight = (int) (settings.SCREEN_WIDTH / imageAspectRatio);
+            offsetY = (settings.SCREEN_HEIGHT - mappedHeight) / 2;
+        } else {
+            mappedHeight = settings.SCREEN_HEIGHT;
+            mappedWidth = (int) (settings.SCREEN_HEIGHT * imageAspectRatio);
+            offsetX = (settings.SCREEN_WIDTH - mappedWidth) / 2;
+        }
+
+        int cursorX = (int) (offsetX + (smoothedLandmark.x * mappedWidth));
+        int cursorY = (int) (offsetY + (smoothedLandmark.y * mappedHeight));
 
         listener.onUpdateCursor(cursorX, cursorY);
 
         // --- 2. 手勢檢測 ---
-        // 優先檢測“畫圈”或“握拳”，因為它們是更明確的全局操作
+        if (detectBackHook(landmarks)) return; // 勾指返回优先
         if (detectIndexFingerUp(landmarks)) {
-            // 如果是食指伸直的“準備”姿勢，則開始記錄軌跡以判斷畫圈
             processCircleGesture(smoothedLandmark);
-            return; // 處於畫圈模式時，不檢測點擊和握拳
+            return;
         } else {
-            // 如果不是食指伸直姿勢，則清空畫圈軌跡
             circlePath.clear();
         }
 
@@ -227,6 +241,51 @@ public class GestureProcessor {
                 getDistance(landmarks.get(20), wrist) < settings.FIST_THRESHOLD;
     }
 
+    private boolean isBackGestureReady = false;
+
+    /**
+     * [新算法] 檢測食指、中指、無名指伸直後向手心勾的返回手勢。
+     * @return 如果觸發了返回手勢，返回 true。
+     */
+    private boolean detectBackHook(List<NormalizedLandmark> landmarks) {
+        // 判斷手指是否伸直：指尖Y坐標 < 第二關節Y坐標
+        boolean indexStraight = landmarks.get(8).y() < landmarks.get(6).y();
+        boolean middleStraight = landmarks.get(12).y() < landmarks.get(10).y();
+        boolean ringStraight = landmarks.get(16).y() < landmarks.get(14).y();
+        // 判斷小指和拇指是否彎曲
+        boolean pinkyBent = landmarks.get(20).y() > landmarks.get(18).y();
+        boolean thumbBent = landmarks.get(4).x() > landmarks.get(3).x(); // 簡單判斷拇指是否內收
+
+        // 條件1：進入準備狀態
+        if (indexStraight && middleStraight && ringStraight && pinkyBent && thumbBent) {
+            isBackGestureReady = true;
+        }
+
+        // 條件2：從準備狀態，檢測到手指彎曲（觸發）
+        if (isBackGestureReady) {
+            // 判斷手指是否彎曲：指尖Y坐標 > 第一關節Y坐標
+            boolean indexHooked = landmarks.get(8).y() > landmarks.get(5).y();
+            boolean middleHooked = landmarks.get(12).y() > landmarks.get(9).y();
+            boolean ringHooked = landmarks.get(16).y() > landmarks.get(13).y();
+
+            if (indexHooked && middleHooked && ringHooked) {
+                if (System.currentTimeMillis() - lastBackActionTime > settings.BACK_DEBOUNCE) {
+                    listener.onPerformBack();
+                    lastBackActionTime = System.currentTimeMillis();
+                }
+                isBackGestureReady = false; // 重置狀態
+                return true; // 消耗此幀，不再檢測其他手勢
+            }
+        }
+
+        // 如果手指不再伸直，則重置準備狀態
+        if (!indexStraight || !middleStraight || !ringStraight) {
+            isBackGestureReady = false;
+        }
+
+        return false;
+    }
+
     /**
      * [新算法] 檢測是否為食指伸出、其餘四指彎曲的“畫圈準備”姿勢。
      * @return 如果滿足姿勢條件，返回 true。
@@ -236,7 +295,7 @@ public class GestureProcessor {
         boolean middleBent = landmarks.get(12).y() > landmarks.get(10).y();
         boolean ringBent = landmarks.get(16).y() > landmarks.get(14).y();
         boolean pinkyBent = landmarks.get(20).y() > landmarks.get(18).y();
-        boolean thumbBent = landmarks.get(4).x() > landmarks.get(3).x(); // 簡單判斷拇指是否內收
+        boolean thumbBent = landmarks.get(4).x() > landmarks.get(3).x();
 
         return indexStraight && middleBent && ringBent && pinkyBent && thumbBent;
     }
@@ -246,23 +305,18 @@ public class GestureProcessor {
      * @param currentPoint 當前食指指尖的平滑坐標。
      */
     private void processCircleGesture(PointF currentPoint) {
-        // 防抖檢查
-        if (System.currentTimeMillis() - lastBackActionTime < settings.BACK_DEBOUNCE) {
-            return;
-        }
+        if (System.currentTimeMillis() - lastBackActionTime < settings.BACK_DEBOUNCE) return;
 
         circlePath.add(currentPoint);
 
-        // 當軌跡點足夠多時，開始分析是否構成圓圈
         if (circlePath.size() > CIRCLE_GESTURE_MIN_POINTS) {
             if (isPathACircle()) {
                 listener.onPerformBack();
                 lastBackActionTime = System.currentTimeMillis();
-                circlePath.clear(); // 觸發後清空軌跡
+                circlePath.clear();
             }
         }
 
-        // 限制軌跡歷史長度，防止內存溢出
         if (circlePath.size() > 50) {
             circlePath.remove(0);
         }
@@ -278,14 +332,12 @@ public class GestureProcessor {
         PointF startPoint = circlePath.get(0);
         PointF endPoint = circlePath.get(circlePath.size() - 1);
 
-        // 條件1：起點和終點必須足夠接近，表示軌跡閉合
         float dx = startPoint.x - endPoint.x;
         float dy = startPoint.y - endPoint.y;
         if (Math.sqrt(dx*dx + dy*dy) > CIRCLE_GESTURE_COMPLETION_THRESHOLD) {
             return false;
         }
 
-        // 條件2：計算軌跡的質心和平均半徑
         float centerX = 0, centerY = 0;
         for (PointF p : circlePath) {
             centerX += p.x;
@@ -300,7 +352,6 @@ public class GestureProcessor {
         }
         float avgRadius = totalRadius / circlePath.size();
 
-        // 條件3：平均半徑必須大於一個最小值，以排除點狀抖動
         return avgRadius > CIRCLE_GESTURE_MIN_RADIUS;
     }
 
@@ -322,13 +373,11 @@ public class GestureProcessor {
             return new PointF(newX, newY);
         }
 
-        // 複製列表並排序，以找到中位數
         List<Float> sortedX = new ArrayList<>(xHistory);
         List<Float> sortedY = new ArrayList<>(yHistory);
         Collections.sort(sortedX);
         Collections.sort(sortedY);
 
-        // 中位數是列表排序後的中間值
         float smoothedX = sortedX.get(sortedX.size() / 2);
         float smoothedY = sortedY.get(sortedY.size() / 2);
 

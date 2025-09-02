@@ -1,6 +1,6 @@
 // =================================================================================
-// 文件: app/src/main/java/com/yidroid/argesture/GestureViewControl.java
-// 描述: [已重构] 负责光标悬浮窗管理。
+// 文件: app/src/main/java/com/yidroid/argesture/CursorControl.java
+// 描述: 仅负责光标的创建和管理。
 // =================================================================================
 package com.yidroid.argesture;
 
@@ -9,29 +9,26 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
-import android.graphics.SurfaceTexture;
 import android.view.Gravity;
-import android.view.Surface;
-import android.view.TextureView;
 import android.view.View;
 import android.view.WindowManager;
 
 import androidx.annotation.NonNull;
 
-public class GestureViewControl {
+public class CursorControl {
 
     private final Context context;
     private final WindowManager windowManager;
     private final GestureSettings settings;
     private View cursorView;
 
-    public GestureViewControl(Context context) {
+    public CursorControl(Context context) {
         this.context = context;
         this.windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         this.settings = GestureSettings.getInstance(context);
     }
 
-    public void createCursor() {
+    public void create() {
         if (cursorView != null) return;
         cursorView = new View(context);
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
@@ -49,20 +46,20 @@ public class GestureViewControl {
         cursorView.setVisibility(View.VISIBLE);
     }
 
-    public void removeCursor() {
+    public void destroy() {
         if (windowManager != null && cursorView != null && cursorView.isAttachedToWindow()) {
             windowManager.removeView(cursorView);
             cursorView = null;
         }
     }
 
-    public void setCursorVisibility(boolean visible) {
+    public void setVisibility(boolean visible) {
         if (cursorView != null) {
             cursorView.setVisibility(visible ? View.VISIBLE : View.GONE);
         }
     }
 
-    public void updateCursorPosition(int x, int y) {
+    public void updatePosition(int x, int y) {
         if (cursorView == null) return;
         WindowManager.LayoutParams params = (WindowManager.LayoutParams) cursorView.getLayoutParams();
         params.x = x - params.width / 2;

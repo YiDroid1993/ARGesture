@@ -175,7 +175,11 @@ public class CameraHelper {
             super.onCameraUnavailable(cameraId);
             if (activeCameraId != null && activeCameraId.equals(cameraId) && captureSession != null) {
                 Log.w(TAG, "Our active camera (" + cameraId + ") became unavailable (likely used by another app).");
-                captureSession.close();
+                try {
+                    captureSession.close();
+                } catch(Exception e) {
+                    Log.e(TAG, "Error closing capture session on unavailable", e);
+                }
             }
         }
     };
@@ -183,6 +187,12 @@ public class CameraHelper {
     private void createCaptureSession(Surface previewSurface) {
         if (isStopping || cameraDevice == null || previewSurface == null || !previewSurface.isValid() || imageReader == null) return;
         try {
+            // **关键修正：在创建新会话之前，确保关闭任何可能存在的旧会话**
+            if (captureSession != null) {
+                captureSession.close();
+                captureSession = null;
+            }
+
             Surface imageReaderSurface = imageReader.getSurface();
             final CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             builder.addTarget(imageReaderSurface);
@@ -191,21 +201,20 @@ public class CameraHelper {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
                     if (cameraDevice == null) return;
+                    captureSession = session;
                     try {
-                        captureSession = session;
                         builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
                         builder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, new Range<>(settings.DESIRED_CAMERA_FPS, settings.DESIRED_CAMERA_FPS));
                         session.setRepeatingRequest(builder.build(), null, cameraHandler);
                         Log.d(TAG, "Capture session configured and repeating request set.");
-                    } catch (CameraAccessException e) {
+                    } catch (CameraAccessException | IllegalStateException e) { // ** 关键修正：捕获IllegalStateException **
                         listener.onCameraError("Failed to start camera preview: " + e.getMessage());
                     }
                 }
                 @Override
                 public void onConfigureFailed(@NonNull CameraCaptureSession session) {
                     listener.onCameraError("Failed to configure capture session.");
-                    session.close();
-                    captureSession = null;
+                    try { session.close(); } catch(Exception e) { /* ignore */ }
                 }
             }, cameraHandler);
         } catch (CameraAccessException e) {
